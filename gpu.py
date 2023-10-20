@@ -1,16 +1,22 @@
+#!/usr/bin/env python3
+
+import sys
 from typing import List, Dict, Tuple, Set, Iterable, Any
+import argparse
 import subprocess
 from collections import defaultdict
+import re
 
 
 UNK_GPU = 'gpu'
 RUN_ST = 'R'
 PEND_ST = 'PD'
+FLAG = {'verbose': False}
 
 
 def parse_nodes(nodes: str) -> List[str]:
-  if not nodes.startswith('tir'):
-    return []
+  # if not nodes.startswith('tir'):
+    # return []
   if '[' not in nodes:
     return [nodes]
   prefix, ns = nodes[:-1].split('[')
@@ -26,7 +32,10 @@ def parse_gres(gres: str) -> List[Tuple[str, int]]:
     if len(atype) == 3:
       gpus.append((atype[1], int(atype[2])))
     elif len(atype) == 2:
-      gpus.append((atype[0], int(atype[1])))
+      try:
+        gpus.append((atype[0], int(atype[1])))
+      except:
+        gpus.append((atype[1], 1))  # didn't specify num
     else:
       raise NotImplementedError
   return gpus
@@ -34,7 +43,12 @@ def parse_gres(gres: str) -> List[Tuple[str, int]]:
 
 def parse_table(command: str, columns: List[str]) -> Iterable[Dict]:
   p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
-  rows = p.stdout.read().decode('utf-8').rstrip('\n')
+  out = p.stdout.read().decode('utf-8')
+  if FLAG['verbose']:
+    print(f'COMMAND: {command}')
+    print(out)
+    print()
+  rows = out.rstrip('\n')
   rows = rows.split('\n')[1:]
   for row in rows:
     info: Dict[str, str] = dict(zip(columns, map(lambda x: x.strip(), row.split('\t'))))
@@ -49,8 +63,8 @@ def pretty(gpu2status2user2count: Dict[str, Dict[str, Dict[str, int]]], gpu2coun
   unknow_gpu = defaultdict(lambda: 0)
   unknow_gpu.update({s: sum(u2c.values()) for s, u2c in gpu2status2user2count[UNK_GPU].items()})
   del gpu2status2user2count['gpu']
-  print('{:<10} | {:<25}{:>8} | {:<12}{:>8} | {:>6} | {:>6}'.format('GPU', f'top-{max_display_user}', 'Running', f'top-{max_display_user}', 'Pending', 'Free', 'Total'))
-  print('-' * 88)
+  print('{:<10} | {:<40}{:>8} | {:<35}{:>8} | {:>6} | {:>6}'.format('GPU', f'top-{max_display_user}', 'Running', f'top-{max_display_user}', 'Pending', 'Free', 'Total'))
+  print('-' * 126)
   allgpu: Set[str] = set(gpu2count.keys())
   inusegpu: Set[str] = set(gpu2status2user2count.keys())
   for gpu in list(inusegpu) + list(allgpu - inusegpu):
@@ -58,10 +72,10 @@ def pretty(gpu2status2user2count: Dict[str, Dict[str, Dict[str, int]]], gpu2coun
     status2count = defaultdict(lambda: 0)
     status2count.update({s: sum(u2c.values()) for s, u2c in status2user2count.items()})
     status2count['F'] = gpu2count[gpu] - status2count['R']
-    print('{:<10} | {:<25}{:>8} | {:<12}{:>8} | {:>6} | {:>6}'.format(
+    print('{:<10} | {:<40}{:>8} | {:<35}{:>8} | {:>6} | {:>6}'.format(
       gpu,
-      show_user(status2user2count[RUN_ST], 25), status2count[RUN_ST],
-      show_user(status2user2count[PEND_ST], 12), status2count[PEND_ST],
+      show_user(status2user2count[RUN_ST], 40), status2count[RUN_ST],
+      show_user(status2user2count[PEND_ST], 35), status2count[PEND_ST],
       status2count['F'], gpu2count[gpu]))
     for u, c in status2user2count[RUN_ST].items():
       user2count[u] += c
@@ -76,10 +90,20 @@ def get_gpu_config(filename: str = '/etc/slurm/gres.conf') -> Tuple[Dict[str, Di
   node2id2gpu: Dict[str, Dict[int, str]] = defaultdict(lambda: {})
   with open(filename, 'r') as fin:
     for l in fin:
+      l = l.strip()
+      if len(l) <= 0 or l[0] == '#':
+        continue
       nodes, _, gputype, gpuids = l.split()  # NodeName=tir-0-[7,9,13,15,17,19] Name=gpu Type=TITANX File=/dev/nvidia[0-3]
       nodes = parse_nodes(nodes.strip().split('=', 1)[1])
       gputype = gputype.strip().split('=', 1)[1]
-      gpuid_s, gpuid_e = list(map(int, gpuids.strip().split('[', 1)[1][:-1].split('-')))  # both inclusive
+      if '[' in gpuids:
+        gpuid_s, gpuid_e = list(map(int, gpuids.strip().split('[', 1)[1][:-1].split('-')))  # both inclusive
+      elif gpuids[-1].isnumeric():
+        gpuid_s = int(re.search(r'\d+$', gpuids).group())
+        gpuid_e = gpuid_s
+      else:
+        sys.stderr.write("Error parsing gpuids: " + gpuids)
+
       gpuid_e += 1  # exclusive
       gpu2count[gputype] += len(nodes) * (gpuid_e - gpuid_s)
       for node in nodes:
@@ -94,7 +118,12 @@ def get_job_info(jobid: str) -> Dict[str, Any]:  # TODO: only work for single no
   node_anchor = ' Nodes='
   result = {'nodes': [], 'gpu_ids': []}
   p = subprocess.Popen(job_command, shell=True, stdout=subprocess.PIPE)
-  job_info = p.stdout.read().decode('utf-8').rstrip('\n')
+  out = p.stdout.read().decode('utf-8')
+  if FLAG['verbose']:
+    print(f'COMMAND: {job_command}')
+    print(out)
+    print('')
+  job_info = out.rstrip('\n')
   n = job_info.find(node_anchor)
   nodes = parse_nodes(job_info[n + len(node_anchor):].split(' ', 1)[0])
   g = job_info.find(gpu_anchor)
@@ -103,6 +132,8 @@ def get_job_info(jobid: str) -> Dict[str, Any]:  # TODO: only work for single no
   ids: str = job_info[g + len(gpu_anchor):].split('(', 1)[1].split(')', 1)[0][len('IDX:'):]
   if ',' in ids:  # separate ids
     _ids: List[str] = ids.split(',')
+  elif ids.strip() == '':  # skip this job
+    return result
   else:
     _ids: List[str] = [ids]
   merge_ids: List[int] = []
@@ -140,6 +171,8 @@ def gpu_summary():
         continue
       if gputype == UNK_GPU and st == RUN_ST:
         jobinfo = get_job_info(jobid)
+        if len(jobinfo['nodes']) <= 0:
+          continue
         ids = jobinfo['gpu_ids'][:count]
         node = jobinfo['nodes'][0]
         for i in ids:
@@ -149,7 +182,11 @@ def gpu_summary():
         gpu2status2user2count[gputype][st][user] += count
 
   # display
-  pretty(gpu2status2user2count, gpu2count)
+  pretty(gpu2status2user2count, gpu2count, max_display_user=3)
 
 
+parser = argparse.ArgumentParser(description='slurm gpu info')
+parser.add_argument('--verbose', action='store_true', help='print results of all commands used')
+args = parser.parse_args()
+FLAG['verbose'] = args.verbose
 gpu_summary()
