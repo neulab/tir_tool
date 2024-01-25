@@ -86,6 +86,9 @@ def pretty(gpu2status2user2count: Dict[str, Dict[str, Dict[str, int]]], gpu2coun
 
 
 def get_gpu_config(filename: str = '/etc/slurm/gres.conf') -> Tuple[Dict[str, Dict[int, str]], Dict[str, int]]:
+  available_nodes_command = 'sinfo --responding -N -p debug -o "%N" --noheader'
+  p = subprocess.Popen(available_nodes_command, shell=True, stdout=subprocess.PIPE)
+  available_nodes = set(p.stdout.read().decode('utf-8').strip().splitlines())
   gpu2count: Dict[str, int] = defaultdict(lambda: 0)
   node2id2gpu: Dict[str, Dict[int, str]] = defaultdict(lambda: {})
   with open(filename, 'r') as fin:
@@ -95,6 +98,7 @@ def get_gpu_config(filename: str = '/etc/slurm/gres.conf') -> Tuple[Dict[str, Di
         continue
       nodes, _, gputype, gpuids = l.split()  # NodeName=tir-0-[7,9,13,15,17,19] Name=gpu Type=TITANX File=/dev/nvidia[0-3]
       nodes = parse_nodes(nodes.strip().split('=', 1)[1])
+      nodes = [n for n in nodes if n in available_nodes]
       gputype = gputype.strip().split('=', 1)[1]
       if '[' in gpuids:
         gpuid_s, gpuid_e = list(map(int, gpuids.strip().split('[', 1)[1][:-1].split('-')))  # both inclusive
@@ -112,7 +116,7 @@ def get_gpu_config(filename: str = '/etc/slurm/gres.conf') -> Tuple[Dict[str, Di
   return node2id2gpu, gpu2count
 
 
-def get_job_info(jobid: str) -> Dict[str, Any]:  # TODO: only work for single node jobs
+def get_job_info(jobid: str) -> Dict[str, Any]:  # TODO: this doesn't work for job arrays
   job_command = f'scontrol show jobid -dd {jobid}'
   gpu_anchor = 'GRES=gpu'
   node_anchor = ' Nodes='
