@@ -118,7 +118,8 @@ def get_gpu_config(filename: str = '/etc/slurm/gres.conf') -> Tuple[Dict[str, Di
   return node2id2gpu, gpu2count
 
 
-def get_job_info(jobid: str) -> Dict[str, Any]:  # TODO: this doesn't work for job arrays
+def get_job_info(jobid: str) -> Dict[str, Any]:
+  # Note: this won't work with job arrays, but job arrays' base job IDs are not listed when using "squeue -o %i" so we should be fine
   job_command = f'scontrol show jobid -dd {jobid}'
   gpu_anchor = 'GRES=gpu'
   node_anchor = ' Nodes='
