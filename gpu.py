@@ -17,12 +17,16 @@ FLAG = {'verbose': False}
 def parse_nodes(nodes: str) -> List[str]:
   # Example: babel-1-[23,27,31],babel-2-12
   nodelist = []
-  for node in nodes.split(','):
-    if '[' in node:
-      prefix, ns = node[:-1].split('[')
-      nodelist.extend([prefix + n for n in ns.split(',')])
+  prefix = ''
+  for s in nodes.split(','):
+    if '[' in s:
+      prefix, ns = s.split('[')
+      nodelist.append(prefix + ns)
+    elif ']' in s:
+      nodelist.append(prefix + s[:-1])
+      prefix = ''
     else:
-      nodelist.append(node)
+      nodelist.append(prefix + s)
   return nodelist
 
 
