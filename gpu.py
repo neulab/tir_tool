@@ -134,6 +134,8 @@ def get_job_info(jobid: str) -> Dict[str, Any]:
     print(out)
     print('')
   job_info = out.rstrip('\n')
+  # Example line to parse: Nodes=babel-1-27 CPU_IDs=0-15,32-47 Mem=204800 GRES=gpu:A6000:4(IDX:0-3)
+  # TODO: there are multiple such lines in multi-node job, currently we are only parsing the first one
   n = job_info.find(node_anchor)
   nodes = parse_nodes(job_info[n + len(node_anchor):].split(' ', 1)[0])
   g = job_info.find(gpu_anchor)
@@ -153,6 +155,7 @@ def get_job_info(jobid: str) -> Dict[str, Any]:
       merge_ids.extend(range(int(s), int(e) + 1))
     else:
       merge_ids.append(int(__ids))
+  # TODO: the output structure will need to be modified if we want to support multi-node jobs
   result['nodes'] = [nodes[0]]
   result['gpu_ids'] = merge_ids
   return result
@@ -173,6 +176,7 @@ def gpu_summary():
   for job in parse_table(job_command, job_cols):
     user = job['USER']
     jobid = job['JOBID']
+    # TODO: fix this, TRES_PER_NODE is "N/A" for multi-node GPU jobs, so parse_gres() returns empty list
     gpus = parse_gres(job['TRES_PER_NODE'])
     st = job['ST']
     if st == RUN_ST and parse_nodes(job['NODELIST(REASON)'])[0] not in node2id2gpu:
