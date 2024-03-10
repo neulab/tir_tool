@@ -157,9 +157,9 @@ def get_job_info(jobid: str) -> Dict[str, Any]:
 
 def gpu_summary():
   info_cols = ['NODELIST', 'CPUS', 'MEMORY', 'AVAIL_FEATURES', 'GRES']
-  info_command = 'sinfo -o "%50N\t%10c\t%10m\t%25f\t%50G"'
+  info_command = 'sinfo -a -o "%50N\t%10c\t%10m\t%25f\t%50G"'
   job_cols = ['JOBID', 'PARTITION', 'USER', 'ST', 'TIME', 'NODES', 'NODELIST(REASON)', 'NAME', 'TRES_PER_NODE']
-  job_command = 'squeue -o "%.18i\t%.9P\t%.20u\t%.2t\t%.12M\t%.6D\t%.15R\t%.20j\t%.20b"'
+  job_command = 'squeue -a -o "%.18i\t%.9P\t%.20u\t%.2t\t%.12M\t%.6D\t%.15R\t%.20j\t%.20b"'
 
   # summarize gpu
   node2id2gpu, gpu2count = get_gpu_config()
@@ -172,6 +172,8 @@ def gpu_summary():
     jobid = job['JOBID']
     gpus = parse_gres(job['TRES_PER_NODE'])
     st = job['ST']
+    if st == RUN_ST and parse_nodes(job['NODELIST(REASON)'])[0] not in node2id2gpu:
+      continue
     for gpu in gpus:
       gputype, count = gpu
       if count <= 0:
