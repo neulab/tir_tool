@@ -15,12 +15,15 @@ FLAG = {'verbose': False}
 
 
 def parse_nodes(nodes: str) -> List[str]:
-  # if not nodes.startswith('tir'):
-    # return []
-  if '[' not in nodes:
-    return [nodes]
-  prefix, ns = nodes[:-1].split('[')
-  return [prefix + n for n in ns.split(',')]
+  # Example: babel-1-[23,27,31],babel-2-12
+  nodelist = []
+  for node in nodes.split(','):
+    if '[' in node:
+      prefix, ns = node[:-1].split('[')
+      nodelist.extend([prefix + n for n in ns.split(',')])
+    else:
+      nodelist.append(node)
+  return nodelist
 
 
 def parse_gres(gres: str) -> List[Tuple[str, int]]:
@@ -121,7 +124,7 @@ def get_gpu_config(filename: str = '/etc/slurm/gres.conf') -> Tuple[Dict[str, Di
 def get_job_info(jobid: str) -> Dict[str, Any]:
   # Note: this won't work with job arrays, but job arrays' base job IDs are not listed when using "squeue -o %i" so we should be fine
   job_command = f'scontrol show jobid -dd {jobid}'
-  gpu_anchor = 'GRES=gpu'
+  gpu_anchor = ' GRES=gpu'
   node_anchor = ' Nodes='
   result = {'nodes': [], 'gpu_ids': []}
   p = subprocess.Popen(job_command, shell=True, stdout=subprocess.PIPE)
