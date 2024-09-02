@@ -101,7 +101,6 @@ def get_gpu_config(filename: str = '/etc/slurm/gres.conf') -> Tuple[Dict[str, Di
     tuple(n.split(";"))
     for n in p.stdout.read().decode('utf-8').strip().splitlines()
   )
-  print(all_nodes_and_states)
   available_nodes = {
     n[0]
     for n in all_nodes_and_states
