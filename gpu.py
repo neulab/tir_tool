@@ -76,7 +76,7 @@ def pretty(gpu2status2user2count: Dict[str, Dict[str, Dict[str, int]]], gpu2coun
   print('-' * 126)
   allgpu: Set[str] = set(gpu2count.keys())
   inusegpu: Set[str] = set(gpu2status2user2count.keys())
-  for gpu in list(inusegpu) + list(allgpu - inusegpu):
+  for gpu in sorted(list(inusegpu) + list(allgpu - inusegpu)):
     status2user2count = gpu2status2user2count[gpu]
     status2count = defaultdict(lambda: 0)
     status2count.update({s: sum(u2c.values()) for s, u2c in status2user2count.items()})
