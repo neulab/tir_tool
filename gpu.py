@@ -95,9 +95,18 @@ def pretty(gpu2status2user2count: Dict[str, Dict[str, Dict[str, int]]], gpu2coun
 
 
 def get_gpu_config(filename: str = '/etc/slurm/gres.conf') -> Tuple[Dict[str, Dict[int, str]], Dict[str, int]]:
-  available_nodes_command = 'sinfo --responding -N -o "%N" --noheader'
+  available_nodes_command = 'sinfo --responding -N -o "%N;%t" --noheader'
   p = subprocess.Popen(available_nodes_command, shell=True, stdout=subprocess.PIPE)
-  available_nodes = set(p.stdout.read().decode('utf-8').strip().splitlines())
+  all_nodes_and_states = set(
+    tuple(n.split(";"))
+    for n in p.stdout.read().decode('utf-8').strip().splitlines()
+  )
+  print(all_nodes_and_states)
+  available_nodes = {
+    n[0]
+    for n in all_nodes_and_states
+    if n[1] in ("idle", "mix", "alloc")
+  }
   gpu2count: Dict[str, int] = defaultdict(lambda: 0)
   node2id2gpu: Dict[str, Dict[int, str]] = defaultdict(lambda: {})
   with open(filename, 'r') as fin:
