@@ -12,6 +12,14 @@ UNK_GPU = 'gpu'
 RUN_ST = 'R'
 PEND_ST = 'PD'
 FLAG = {'verbose': False}
+# The reasons which we want to count as "pending".  E.g., don't count jobs
+# pending because they exceed the partition time limit, are waiting on
+# a dependency, or can't get a requested node because it is down.
+PENDING_REASONS = (
+  "(Resources)",
+  "(Priority)",
+)
+
 
 
 def parse_nodes(nodes: str) -> List[str]:
@@ -177,7 +185,7 @@ def gpu_summary():
   info_cols = ['NODELIST', 'CPUS', 'MEMORY', 'AVAIL_FEATURES', 'GRES']
   info_command = 'sinfo -a -o "%50N\t%10c\t%10m\t%25f\t%50G"'
   job_cols = ['JOBID', 'PARTITION', 'USER', 'ST', 'TIME', 'NODES', 'NODELIST(REASON)', 'NAME', 'TRES_PER_NODE']
-  job_command = 'squeue -a -o "%.18i\t%.9P\t%.20u\t%.2t\t%.12M\t%.6D\t%.15R\t%.20j\t%.20b"'
+  job_command = 'squeue -a -o "%.18i\t%.9P\t%.20u\t%.2t\t%.12M\t%.6D\t%.25R\t%.20j\t%.20b"'
 
   # summarize gpu
   node2id2gpu, gpu2count = get_gpu_config()
@@ -190,7 +198,10 @@ def gpu_summary():
     jobid = job['JOBID']
     # TODO: fix this, TRES_PER_NODE is "N/A" for multi-node GPU jobs, so parse_gres() returns empty list
     gpus = parse_gres(job['TRES_PER_NODE'])
+    reason = job["NODELIST(REASON)"]
     st = job['ST']
+    if st == "PD" and reason not in PENDING_REASONS:
+      st = "PD-other"
     if st == RUN_ST and parse_nodes(job['NODELIST(REASON)'])[0] not in node2id2gpu:
       continue
     for gpu in gpus:
