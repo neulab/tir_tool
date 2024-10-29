@@ -126,6 +126,8 @@ def get_gpu_config(filename: str = '/run/slurm/conf/nodes.conf') -> Tuple[Dict[s
       if not m:
         continue
       node, gpu_sets = m.groups()
+      if node not in available_nodes:
+        continue
       gpu_idx = 0
       for gpu_set in gpu_sets.split(","):
         gres_type, gpu_type, _gpu_count = gpu_set.split(":")
