@@ -123,6 +123,8 @@ def get_gpu_config(filename: str = '/run/slurm/conf/nodes.conf') -> Tuple[Dict[s
         continue
       # Example: NodeName=babel-a-20 CPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCore=2 RealMemory=483000 Gres=gpu:A100_40GB:8,gpu:K80:1
       m = re.match(r"^NodeName=([-a-z0-9]+).*Gres=([:a-zA-Z0-9_,]+).*$", l)
+      if not m:
+        continue
       node, gpu_sets = m.groups()
       gpu_idx = 0
       for gpu_set in gpu_sets.split(","):
