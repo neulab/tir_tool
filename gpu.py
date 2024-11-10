@@ -51,7 +51,7 @@ def parse_gres(gres: str) -> List[Tuple[str, int]]:
         gpus.append((atype[0], int(atype[1])))
       except:
         gpus.append((atype[1], 1))  # didn't specify num
-    elif len(atype) == 1 and atype[0] == "gpu":
+    elif len(atype) == 1 and atype[0] in ["gpu", "gres/gpu"]:
         gpus.append(("gpu", 1))  # didn't specify gpu or num
     else:
       raise NotImplementedError
