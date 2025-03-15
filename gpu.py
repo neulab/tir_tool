@@ -43,7 +43,7 @@ def parse_gres(gres: str) -> List[Tuple[str, int]]:
     return []
   gpus = []
   for atype in gres.split(','):
-    atype = atype.split(':')
+    atype = re.split('[:=]', atype)
     if len(atype) == 3:
       gpus.append((atype[1], int(atype[2])))
     elif len(atype) == 2:
@@ -54,7 +54,7 @@ def parse_gres(gres: str) -> List[Tuple[str, int]]:
     elif len(atype) == 1 and atype[0] in ["gpu", "gres/gpu"]:
         gpus.append(("gpu", 1))  # didn't specify gpu or num
     else:
-      raise NotImplementedError
+      print("WARNING: couldn't parse " + atype, file=sys.stderr)
   return gpus
 
 
